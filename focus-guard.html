@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FocusGuard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --border: #1e1e2e;
+    --accent: #00ff88;
+    --danger: #ff3355;
+    --warn: #ffcc00;
+    --text: #e0e0f0;
+    --muted: #555570;
+    --glow: 0 0 20px rgba(0,255,136,0.4);
+    --glow-danger: 0 0 30px rgba(255,51,85,0.6);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 16px 0 8px;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    line-height: 1;
+  }
+  .tagline {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Status ring */
+  .status-ring-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+  }
+  .ring-container {
+    position: relative;
+    width: 180px;
+    height: 180px;
+  }
+  .ring-svg {
+    width: 180px;
+    height: 180px;
+    transform: rotate(-90deg);
+  }
+  .ring-bg { fill: none; stroke: var(--border); stroke-width: 8; }
+  .ring-fill {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 502;
+    stroke-dashoffset: 502;
+    transition: stroke-dashoffset 0.5s ease, stroke 0.3s;
+    filter: drop-shadow(0 0 6px var(--accent));
+  }
+  .ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+  .ring-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .ring-time {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    color: var(--text);
+    line-height: 1;
+    letter-spacing: 2px;
+  }
+  .ring-status {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  /* Sensor bar */
+  .sensor-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .sensor-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .sensor-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bar-axis {
+    font-size: 10px;
+    color: var(--muted);
+    width: 14px;
+    text-align: center;
+  }
+  .bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 99px;
+    transition: width 0.15s ease, background 0.2s;
+  }
+  .bar-val {
+    font-size: 9px;
+    color: var(--muted);
+    width: 40px;
+    text-align: right;
+  }
+
+  /* Movement meter */
+  .movement-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .movement-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .movement-title {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .threshold-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    background: var(--border);
+    border: none;
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 99px;
+    cursor: pointer;
+  }
+  .movement-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    transition: color 0.2s, text-shadow 0.2s;
+  }
+  .movement-sub {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+  .movement-bar-track {
+    margin-top: 12px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .movement-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #00ccff);
+    border-radius: 99px;
+    transition: width 0.15s ease, background 0.2s;
+  }
+  .threshold-line {
+    position: relative;
+    height: 0;
+  }
+  .threshold-marker {
+    position: absolute;
+    top: -16px;
+    width: 2px;
+    height: 8px;
+    background: var(--warn);
+    border-radius: 1px;
+    transition: left 0.3s;
+  }
+
+  /* Sensitivity control */
+  .sensitivity-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .sens-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 99px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,255,136,0.5);
+  }
+  .sens-val {
+    font-size: 10px;
+    color: var(--accent);
+    width: 30px;
+    text-align: right;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 12px;
+  }
+  .btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    padding: 14px 0;
+    transition: transform 0.1s, box-shadow 0.2s;
+    flex: 1;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-start {
+    background: var(--accent);
+    color: #0a0a0f;
+    box-shadow: var(--glow);
+  }
+  .btn-reset {
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+  }
+  .stat-box {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Warning overlay */
+  .warning-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.92);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    animation: flashIn 0.2s ease;
+  }
+  .warning-overlay.show { display: flex; }
+  @keyframes flashIn {
+    from { opacity: 0; transform: scale(1.05); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .warn-icon {
+    font-size: 72px;
+    animation: pulse 0.6s ease infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to   { transform: scale(1.12); }
+  }
+  .warn-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    color: var(--danger);
+    letter-spacing: 6px;
+    text-shadow: var(--glow-danger);
+    text-align: center;
+  }
+  .warn-sub {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-align: center;
+    max-width: 260px;
+    line-height: 1.8;
+  }
+  .warn-dismiss {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 3px;
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 40px;
+    cursor: pointer;
+    box-shadow: var(--glow-danger);
+    margin-top: 8px;
+  }
+  .warn-streak {
+    font-size: 10px;
+    color: var(--danger);
+    letter-spacing: 2px;
+  }
+
+  /* Permission prompt */
+  .perm-banner {
+    background: #1a1408;
+    border: 1px solid var(--warn);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 10px;
+    color: var(--warn);
+    letter-spacing: 1px;
+    line-height: 1.7;
+    text-align: center;
+    display: none;
+  }
+  .perm-banner.show { display: block; }
+  .perm-btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    background: var(--warn);
+    color: #0a0a0f;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 20px;
+    cursor: pointer;
+    margin-top: 10px;
+    display: block;
+    width: 100%;
+  }
+
+  /* Active state changes */
+  body.active .ring-fill { stroke: var(--accent); }
+  body.moving .ring-fill { stroke: var(--danger); }
+  body.moving .movement-value { color: var(--danger); text-shadow: var(--glow-danger); }
+  body.moving .movement-bar-fill { background: linear-gradient(90deg, var(--warn), var(--danger)); }
+  body.moving .bar-fill { background: var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">FOCUSGUARD</div>
+    <div class="tagline">Stay still. Stay sharp.</div>
+  </header>
+
+  <!-- Permission banner (iOS) -->
+  <div class="perm-banner" id="permBanner">
+    ⚠️ Your browser requires permission to access the motion sensor.
+    <button class="perm-btn" onclick="requestPermission()">ALLOW MOTION ACCESS</button>
+  </div>
+
+  <!-- Timer ring -->
+  <div class="status-ring-wrap">
+    <div class="ring-container">
+      <svg class="ring-svg" viewBox="0 0 180 180">
+        <circle class="ring-bg" cx="90" cy="90" r="80"/>
+        <circle class="ring-fill" id="ringFill" cx="90" cy="90" r="80"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-label">focused for</div>
+        <div class="ring-time" id="timerDisplay">00:00</div>
+        <div class="ring-status" id="ringStatus">STANDBY</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sensor readout -->
+  <div class="sensor-panel">
+    <div class="sensor-label">// Accelerometer</div>
+    <div class="sensor-bars">
+      <div class="bar-row">
+        <div class="bar-axis">X</div>
+        <div class="bar-track"><div class="bar-fill" id="barX"></div></div>
+        <div class="bar-val" id="valX">0.00</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-axis">Y</div>
+        <div class="bar-track"><div class="bar-fill" id="barY"></div></div>
+        <div class="bar-val" id="valY">0.00</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-axis">Z</div>
+        <div class="bar-track"><div class="bar-fill" id="barZ"></div></div>
+        <div class="bar-val" id="valZ">0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Movement meter -->
+  <div class="movement-panel">
+    <div class="movement-header">
+      <div class="movement-title">// Movement Level</div>
+    </div>
+    <div class="movement-value" id="movVal">0.0</div>
+    <div class="movement-sub">DELTA m/s²</div>
+    <div class="movement-bar-track">
+      <div class="movement-bar-fill" id="movBar"></div>
+    </div>
+    <div class="threshold-line">
+      <div class="threshold-marker" id="threshMarker"></div>
+    </div>
+    <div class="sensitivity-row">
+      <div class="sens-label">SENSITIVITY</div>
+      <input type="range" id="sensitivitySlider" min="1" max="20" value="5" oninput="updateSensitivity(this.value)">
+      <div class="sens-val" id="sensDisplay">5</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-start" id="mainBtn" onclick="toggleSession()">START</button>
+    <button class="btn btn-reset" onclick="resetStats()">RESET</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-val" id="alertCount">0</div>
+      <div class="stat-label">Alerts</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="bestStreak">00:00</div>
+      <div class="stat-label">Best Streak</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="totalTime">00:00</div>
+      <div class="stat-label">Total Focus</div>
+    </div>
+  </div>
+</div>
+
+<!-- Warning overlay -->
+<div class="warning-overlay" id="warningOverlay">
+  <div class="warn-icon">🚨</div>
+  <div class="warn-title">MOVEMENT<br>DETECTED!</div>
+  <div class="warn-sub">You moved your phone.<br>Get back to focus mode!</div>
+  <div class="warn-streak" id="warnStreak"></div>
+  <button class="warn-dismiss" onclick="dismissWarning()">I'M BACK — RESUME</button>
+</div>
+
+<script>
+  // ─── State ───────────────────────────────────────────
+  let running = false;
+  let sessionSeconds = 0;
+  let streakSeconds = 0;
+  let bestStreakSeconds = 0;
+  let totalFocusSeconds = 0;
+  let alertCount = 0;
+  let timerInterval = null;
+  let sensitivity = 5; // threshold: lower = more sensitive
+
+  let lastX = null, lastY = null, lastZ = null;
+  let warningShowing = false;
+  let cooldown = false; // prevent rapid re-triggers
+
+  // ─── Permission (iOS 13+) ─────────────────────────────
+  function checkPermission() {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      document.getElementById('permBanner').classList.add('show');
+    } else {
+      startSensor();
+    }
+  }
+
+  function requestPermission() {
+    DeviceMotionEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        document.getElementById('permBanner').classList.remove('show');
+        startSensor();
+      } else {
+        alert('Motion permission denied. The app needs sensor access to work.');
+      }
+    }).catch(console.error);
+  }
+
+  // ─── Sensor ───────────────────────────────────────────
+  function startSensor() {
+    window.addEventListener('devicemotion', onMotion, true);
+  }
+
+  function onMotion(e) {
+    const acc = e.accelerationIncludingGravity;
+    if (!acc) return;
+
+    const x = acc.x || 0;
+    const y = acc.y || 0;
+    const z = acc.z || 0;
+
+    // Update raw bars
+    document.getElementById('valX').textContent = x.toFixed(2);
+    document.getElementById('valY').textContent = y.toFixed(2);
+    document.getElementById('valZ').textContent = z.toFixed(2);
+    document.getElementById('barX').style.width = Math.min(Math.abs(x) / 20 * 100, 100) + '%';
+    document.getElementById('barY').style.width = Math.min(Math.abs(y) / 20 * 100, 100) + '%';
+    document.getElementById('barZ').style.width = Math.min(Math.abs(z) / 20 * 100, 100) + '%';
+
+    if (lastX === null) { lastX = x; lastY = y; lastZ = z; return; }
+
+    // Delta movement
+    const delta = Math.sqrt(
+      Math.pow(x - lastX, 2) +
+      Math.pow(y - lastY, 2) +
+      Math.pow(z - lastZ, 2)
+    );
+
+    lastX = x; lastY = y; lastZ = z;
+
+    // Update meter
+    document.getElementById('movVal').textContent = delta.toFixed(1);
+    const barPct = Math.min(delta / 30 * 100, 100);
+    document.getElementById('movBar').style.width = barPct + '%';
+
+    // Threshold marker position
+    const threshPct = Math.min(sensitivity / 30 * 100, 100);
+    document.getElementById('threshMarker').style.left = threshPct + '%';
+
+    // Trigger alert
+    if (running && !warningShowing && !cooldown && delta > sensitivity) {
+      triggerWarning(delta);
+    }
+
+    // Visual state
+    if (running && delta > sensitivity) {
+      document.body.classList.add('moving');
+    } else {
+      document.body.classList.remove('moving');
+    }
+  }
+
+  // ─── Timer ────────────────────────────────────────────
+  function formatTime(s) {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
+  }
+
+  function updateRing(seconds, maxSeconds) {
+    const circumference = 502;
+    const progress = Math.min(seconds / maxSeconds, 1);
+    const offset = circumference - progress * circumference;
+    document.getElementById('ringFill').style.strokeDashoffset = offset;
+  }
+
+  function startTimer() {
+    timerInterval = setInterval(() => {
+      if (warningShowing) return;
+      sessionSeconds++;
+      streakSeconds++;
+      totalFocusSeconds++;
+      if (streakSeconds > bestStreakSeconds) {
+        bestStreakSeconds = streakSeconds;
+        document.getElementById('bestStreak').textContent = formatTime(bestStreakSeconds);
+      }
+      document.getElementById('timerDisplay').textContent = formatTime(sessionSeconds);
+      document.getElementById('totalTime').textContent = formatTime(totalFocusSeconds);
+      updateRing(sessionSeconds % 3600, 3600);
+    }, 1000);
+  }
+
+  // ─── Session control ──────────────────────────────────
+  function toggleSession() {
+    running = !running;
+    const btn = document.getElementById('mainBtn');
+    if (running) {
+      btn.textContent = 'PAUSE';
+      document.getElementById('ringStatus').textContent = 'FOCUSED';
+      document.body.classList.add('active');
+      startTimer();
+    } else {
+      btn.textContent = 'RESUME';
+      document.getElementById('ringStatus').textContent = 'PAUSED';
+      document.body.classList.remove('active');
+      clearInterval(timerInterval);
+    }
+  }
+
+  function resetStats() {
+    running = false;
+    clearInterval(timerInterval);
+    sessionSeconds = 0; streakSeconds = 0;
+    bestStreakSeconds = 0; totalFocusSeconds = 0; alertCount = 0;
+    document.getElementById('timerDisplay').textContent = '00:00';
+    document.getElementById('ringStatus').textContent = 'STANDBY';
+    document.getElementById('bestStreak').textContent = '00:00';
+    document.getElementById('totalTime').textContent = '00:00';
+    document.getElementById('alertCount').textContent = '0';
+    document.getElementById('mainBtn').textContent = 'START';
+    document.getElementById('ringFill').style.strokeDashoffset = '502';
+    document.body.classList.remove('active', 'moving');
+    dismissWarning();
+  }
+
+  // ─── Warning ──────────────────────────────────────────
+  function triggerWarning(delta) {
+    warningShowing = true;
+    alertCount++;
+    document.getElementById('alertCount').textContent = alertCount;
+    document.getElementById('warnStreak').textContent =
+      `Your focus streak was ${formatTime(streakSeconds)}`;
+    streakSeconds = 0;
+    document.getElementById('warningOverlay').classList.add('show');
+    // vibrate if supported
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }
+
+  function dismissWarning() {
+    warningShowing = false;
+    document.getElementById('warningOverlay').classList.remove('show');
+    document.body.classList.remove('moving');
+    // cooldown 1.5s to avoid instant re-trigger
+    cooldown = true;
+    setTimeout(() => { cooldown = false; }, 1500);
+  }
+
+  // ─── Sensitivity ─────────────────────────────────────
+  function updateSensitivity(val) {
+    sensitivity = parseFloat(val);
+    document.getElementById('sensDisplay').textContent = val;
+    const threshPct = Math.min(sensitivity / 30 * 100, 100);
+    document.getElementById('threshMarker').style.left = threshPct + '%';
+  }
+
+  // ─── Init ─────────────────────────────────────────────
+  checkPermission();
+  updateSensitivity(5);
+</script>
+</body>
+</html>
