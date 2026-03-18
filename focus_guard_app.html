@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Focus Guard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f0;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  .app {
+    max-width: 380px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .header { text-align: center; }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 600;
+    color: #1a1a1a;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    font-size: 14px;
+    color: #888;
+    margin-top: 4px;
+  }
+
+  .status-ring {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.5rem 0;
+  }
+
+  .ring {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 4px solid #ddd;
+    background: #f0f0eb;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .ring.focused {
+    border-color: #1D9E75;
+    background: #E1F5EE;
+  }
+  .ring.warning {
+    border-color: #E24B4A;
+    background: #FCEBEB;
+    animation: pulse 0.5s infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+  }
+
+  .ring-icon { font-size: 40px; line-height: 1; }
+  .ring-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 8px;
+    color: #888;
+  }
+  .ring.focused .ring-label { color: #0F6E56; }
+  .ring.warning .ring-label { color: #A32D2D; }
+
+  .warning-box {
+    background: #FCEBEB;
+    border: 1px solid #F09595;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: none;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .warning-box.visible { display: flex; }
+  .warning-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+  .warning-text h3 { font-size: 14px; font-weight: 600; color: #791F1F; }
+  .warning-text p { font-size: 13px; color: #A32D2D; margin-top: 2px; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+  .stat-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: center;
+    border: 1px solid #eee;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .sensitivity-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    border: 1px solid #eee;
+  }
+  .sensitivity-row label { font-size: 13px; color: #888; white-space: nowrap; }
+  .sensitivity-row input[type=range] { flex: 1; accent-color: #1D9E75; }
+  .sensitivity-row span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a1a;
+    min-width: 16px;
+    text-align: right;
+  }
+
+  .btn-main {
+    width: 100%;
+    padding: 15px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: -0.2px;
+  }
+  .btn-main:active { transform: scale(0.98); }
+  .btn-main.start { background: #1D9E75; color: #fff; }
+  .btn-main.stop { background: #E24B4A; color: #fff; }
+
+  .permission-note {
+    font-size: 12px;
+    color: #aaa;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .log-section h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #aaa;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .log-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  .log-item {
+    font-size: 12px;
+    color: #666;
+    background: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    border: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+  }
+  .log-time { color: #bbb; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Focus Guard</h1>
+    <p>Stay still, stay focused</p>
+  </div>
+
+  <div class="status-ring">
+    <div class="ring idle" id="ring">
+      <div class="ring-icon" id="ring-icon">💤</div>
+      <div class="ring-label" id="ring-label">Inactive</div>
+    </div>
+  </div>
+
+  <div class="warning-box" id="warning-box">
+    <div class="warning-icon">⚠️</div>
+    <div class="warning-text">
+      <h3>Movement detected!</h3>
+      <p id="warning-msg">Put the phone down and refocus.</p>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Session</div>
+      <div class="stat-value" id="stat-time">0:00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Alerts</div>
+      <div class="stat-value" id="stat-alerts">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Focus %</div>
+      <div class="stat-value" id="stat-focus">—</div>
+    </div>
+  </div>
+
+  <div class="sensitivity-row">
+    <label>Sensitivity</label>
+    <input type="range" min="1" max="5" value="3" step="1" id="sensitivity" />
+    <span id="sens-out">3</span>
+  </div>
+
+  <button class="btn-main start" id="main-btn" onclick="toggleSession()">Start Session</button>
+
+  <p class="permission-note" id="perm-note">Tap Start — your browser will ask permission to use the motion sensor.</p>
+
+  <div class="log-section" id="log-section" style="display:none;">
+    <h2>Movement log</h2>
+    <ul class="log-list" id="log-list"></ul>
+  </div>
+</div>
+
+<script>
+let active = false;
+let alertCount = 0;
+let startTime = null;
+let timerInterval = null;
+let focusedSeconds = 0;
+let totalSeconds = 0;
+let warningTimeout = null;
+let lastX = null, lastY = null, lastZ = null;
+let warningActive = false;
+let cooldown = false;
+
+const ring = document.getElementById('ring');
+const ringIcon = document.getElementById('ring-icon');
+const ringLabel = document.getElementById('ring-label');
+const warningBox = document.getElementById('warning-box');
+const warningMsg = document.getElementById('warning-msg');
+const statTime = document.getElementById('stat-time');
+const statAlerts = document.getElementById('stat-alerts');
+const statFocus = document.getElementById('stat-focus');
+const mainBtn = document.getElementById('main-btn');
+const permNote = document.getElementById('perm-note');
+const sensitivityInput = document.getElementById('sensitivity');
+const sensOut = document.getElementById('sens-out');
+const logSection = document.getElementById('log-section');
+const logList = document.getElementById('log-list');
+
+sensitivityInput.addEventListener('input', () => {
+  sensOut.textContent = sensitivityInput.value;
+});
+
+function getSensitivityThreshold() {
+  const s = parseInt(sensitivityInput.value);
+  const map = { 1: 6, 2: 4, 3: 2.5, 4: 1.5, 5: 0.8 };
+  return map[s] || 2.5;
+}
+
+function setStatus(state) {
+  ring.className = 'ring ' + state;
+  if (state === 'focused') {
+    ringIcon.textContent = '🎯';
+    ringLabel.textContent = 'Focused';
+    warningBox.classList.remove('visible');
+  } else if (state === 'warning') {
+    ringIcon.textContent = '🚨';
+    ringLabel.textContent = 'Move alert!';
+    warningBox.classList.add('visible');
+  } else {
+    ringIcon.textContent = '💤';
+    ringLabel.textContent = 'Inactive';
+    warningBox.classList.remove('visible');
+  }
+}
+
+function addLog(msg) {
+  const now = new Date();
+  const t = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const li = document.createElement('li');
+  li.className = 'log-item';
+  li.innerHTML = `<span>${msg}</span><span class="log-time">${t}</span>`;
+  logList.prepend(li);
+  if (logList.children.length > 10) logList.removeChild(logList.lastChild);
+}
+
+function handleMotion(event) {
+  if (!active) return;
+  const acc = event.accelerationIncludingGravity;
+  if (!acc) return;
+  const x = acc.x || 0, y = acc.y || 0, z = acc.z || 0;
+  if (lastX === null) { lastX = x; lastY = y; lastZ = z; return; }
+  const delta = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ);
+  lastX = x; lastY = y; lastZ = z;
+  if (delta > getSensitivityThreshold() && !cooldown) {
+    triggerWarning(delta);
+  }
+}
+
+function triggerWarning(delta) {
+  warningActive = true;
+  cooldown = true;
+  alertCount++;
+  statAlerts.textContent = alertCount;
+  setStatus('warning');
+  const msgs = [
+    'Put the phone down and refocus.',
+    'Stop moving and stay focused!',
+    'Keep still — you were doing great!',
+    'Distraction detected. Breathe and refocus.'
+  ];
+  warningMsg.textContent = msgs[alertCount % msgs.length];
+  addLog('Movement detected (intensity: ' + (Math.round(delta * 10) / 10) + ')');
+  clearTimeout(warningTimeout);
+  warningTimeout = setTimeout(() => {
+    warningActive = false;
+    cooldown = false;
+    if (active) setStatus('focused');
+  }, 3000);
+}
+
+function updateTimer() {
+  if (!startTime) return;
+  totalSeconds++;
+  if (!warningActive) focusedSeconds++;
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  statTime.textContent = m + ':' + s.toString().padStart(2, '0');
+  if (totalSeconds > 0) {
+    statFocus.textContent = Math.round((focusedSeconds / totalSeconds) * 100) + '%';
+  }
+}
+
+async function requestPermission() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const res = await DeviceMotionEvent.requestPermission();
+      return res === 'granted';
+    } catch(e) { return false; }
+  }
+  return true;
+}
+
+async function toggleSession() {
+  if (!active) {
+    const granted = await requestPermission();
+    if (!granted) {
+      permNote.textContent = 'Permission denied. Please allow motion access in your browser settings.';
+      permNote.style.color = '#A32D2D';
+      return;
+    }
+    active = true;
+    startTime = Date.now();
+    totalSeconds = 0; focusedSeconds = 0; alertCount = 0;
+    statAlerts.textContent = '0'; statFocus.textContent = '—';
+    lastX = null; lastY = null; lastZ = null;
+    setStatus('focused');
+    mainBtn.textContent = 'Stop Session';
+    mainBtn.className = 'btn-main stop';
+    permNote.textContent = 'Session running. Keep the phone still!';
+    permNote.style.color = '';
+    logSection.style.display = '';
+    window.addEventListener('devicemotion', handleMotion);
+    timerInterval = setInterval(updateTimer, 1000);
+  } else {
+    active = false;
+    clearInterval(timerInterval);
+    window.removeEventListener('devicemotion', handleMotion);
+    setStatus('idle');
+    mainBtn.textContent = 'Start Session';
+    mainBtn.className = 'btn-main start';
+    permNote.textContent = 'Session ended. Tap Start to begin a new one.';
+    addLog('Session ended');
+  }
+}
+</script>
+</body>
+</html>
